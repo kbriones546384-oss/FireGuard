@@ -21,6 +21,7 @@
         </h2>
     </div>
     <form method="post" class="stack-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div>
             <label class="form-label" for="rule_name">Rule Name</label>
             <input class="form-control" id="rule_name" name="rule_name" value="{{ rule.rule_name }}" required maxlength="100">

@@ -173,6 +173,17 @@ def current_user():
     }
 
 
+def _get_csrf_token():
+    """Per-session token embedded as a hidden field in every form and checked
+    on every state-changing request, so a malicious third-party page can't
+    trick a logged-in browser into submitting requests on the user's behalf."""
+    token = session.get("_csrf_token")
+    if not token:
+        token = secrets.token_hex(32)
+        session["_csrf_token"] = token
+    return token
+
+
 @app.context_processor
 def inject_globals():
     return {
@@ -180,7 +191,25 @@ def inject_globals():
         "firewall_mode": "Live" if APPLY_FIREWALL_RULES else "Recorded",
         "running_as_admin": is_running_as_admin(),
         "datetime": datetime,
+        "csrf_token": _get_csrf_token(),
     }
+
+
+# ── CSRF protection ──────────────────────────────────────────────────────────
+# /api/agent/* routes are excluded: they're authenticated with a Bearer token
+# by agent.py (a script, not a browser), never carry the session cookie, and
+# so aren't reachable by a cross-site form/script in the first place.
+
+@app.before_request
+def enforce_csrf():
+    if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
+        return
+    if request.path.startswith("/api/agent/"):
+        return
+    submitted = request.form.get("csrf_token", "")
+    expected = session.get("_csrf_token", "")
+    if not submitted or not expected or not secrets.compare_digest(submitted, expected):
+        return Response("CSRF token missing or invalid. Please refresh the page and try again.", status=400)
 
 
 # ── Application-level IP blocking ────────────────────────────────────────────

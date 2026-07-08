@@ -14,6 +14,7 @@
     <div class="panel">
         <div class="panel-header"><h2>Create User</h2></div>
         <form method="post" class="stack-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div>
                 <label class="form-label" for="username">Username</label>
                 <input class="form-control" id="username" name="username" required
@@ -104,6 +105,7 @@
         <div class="modal-actions">
             <button class="btn btn-outline-secondary btn-sm" onclick="closeUserDeleteModal()">Cancel</button>
             <form id="userDeleteForm" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button class="btn btn-danger btn-sm" type="submit">
                     <i data-lucide="trash-2"></i>
                     Delete User

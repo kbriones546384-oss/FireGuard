@@ -10,6 +10,7 @@
     {% if current_user.role in ['Administrator', 'Security Analyst'] %}
     <div class="button-group">
         <form method="post" action="{{ url_for('scan_live_traffic') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button class="btn btn-brand" type="submit" id="scanBtn">
                 <i data-lucide="activity"></i>
                 Scan Live Traffic

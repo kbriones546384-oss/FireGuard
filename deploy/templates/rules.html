@@ -15,6 +15,7 @@
     <div class="panel">
         <div class="panel-header"><h2>Create Rule</h2></div>
         <form method="post" class="stack-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div>
                 <label class="form-label" for="rule_name">Rule Name</label>
                 <input class="form-control" id="rule_name" name="rule_name" required maxlength="100" placeholder="Block RDP attempts">
@@ -118,12 +119,14 @@
                         <td class="text-end">
                             <div style="display:flex;gap:6px;justify-content:flex-end;">
                                 <form method="post" action="{{ url_for('test_rule', rule_id=rule.rule_id) }}" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                     <button class="btn btn-sm btn-outline-success icon-button"
                                             type="submit" title="Simulate traffic (Test Rule)">
                                         <i data-lucide="play"></i>
                                     </button>
                                 </form>
                                 <form method="post" action="{{ url_for('apply_rule_to_firewall', rule_id=rule.rule_id) }}" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                     <button class="btn btn-sm btn-outline-primary icon-button"
                                             type="submit" title="Apply to Windows Firewall">
                                         <i data-lucide="shield-check"></i>
@@ -159,6 +162,7 @@
         <div class="modal-actions">
             <button class="btn btn-outline-secondary btn-sm" onclick="closeDeleteModal()">Cancel</button>
             <form id="deleteForm" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button class="btn btn-danger btn-sm" type="submit">
                     <i data-lucide="trash-2"></i>
                     Delete

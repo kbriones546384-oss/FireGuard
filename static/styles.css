@@ -593,6 +593,34 @@ a:hover { color: #60a5fa; }
     padding: .75rem 1rem !important;
 }
 
+/* ── Password field with show/hide toggle ─────────────────── */
+.password-field {
+    position: relative;
+}
+.password-field .form-control {
+    padding-right: 2.75rem !important;
+}
+.password-toggle-btn {
+    position: absolute;
+    top: 50%;
+    right: .6rem;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    padding: .25rem;
+    display: flex;
+    align-items: center;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+.password-toggle-btn:hover {
+    color: var(--text-primary);
+}
+.password-toggle-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
 /* ── Content grids ────────────────────────────────────────── */
 .content-grid {
     display: grid;

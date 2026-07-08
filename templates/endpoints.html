@@ -259,6 +259,7 @@
                             </button>
                             <form method="post" action="{{ url_for('delete_endpoint', endpoint_id=ep.endpoint_id) }}"
                                   onsubmit="return confirm('Remove endpoint {{ ep.hostname }}?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                 <button type="submit" class="btn btn-sm"
                                         style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.25);
                                                font-size:.7rem;padding:.25rem .55rem;border-radius:6px;">
@@ -289,6 +290,7 @@
         <span style="font-size:.78rem;color:var(--text-muted);">Pushes selected rules to all currently Online endpoints</span>
     </div>
     <form method="post" action="{{ url_for('push_rules_to_all') }}" style="padding:0 0 4px 0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div style="padding:16px;display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
             {% for rule in rules %}
             <label style="display:flex;align-items:center;gap:8px;background:var(--bg-raised);
@@ -327,6 +329,7 @@
             <button class="modal-close" onclick="document.getElementById('registerModal').classList.remove('show')">✕</button>
         </div>
         <form method="post" action="{{ url_for('endpoints') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div class="modal-body">
                 <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:18px;">
                     Enter the hostname of the computer you want to manage. A secure agent token will be generated — paste it into <code>agent_config.json</code> on that machine.
@@ -377,6 +380,7 @@
             <button class="modal-close" onclick="document.getElementById('pushModal').classList.remove('show')">✕</button>
         </div>
         <form id="pushModalForm" method="post" action="">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div class="modal-body">
                 {% if rules %}
                 <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:16px;">

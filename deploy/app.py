@@ -1,3 +1,4 @@
+import base64
 import collections
 import csv
 import ctypes
@@ -16,6 +17,8 @@ from datetime import datetime
 from functools import wraps
 
 import psutil
+import pyotp
+import qrcode
 import sqlite3
 from flask import (
     Flask,
@@ -100,6 +103,11 @@ MONITOR_POLL_SECONDS = 3              # how often the background thread snapshot
 PAGE_SIZE = 20  # rows per page on the Alerts and Traffic Logs pages
 AGENT_OFFLINE_SECONDS = 90  # mark endpoint Offline if no heartbeat for this long
 
+# ── Login security thresholds ───────────────────────────────────────────────
+MAX_LOGIN_ATTEMPTS = 5          # wrong passwords allowed before an account is locked
+LOGIN_LOCKOUT_MINUTES = 15      # how long a locked account stays locked
+TOTP_ISSUER_NAME = "FireGuard"  # shown in the authenticator app next to the account name
+
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "fireguard-dev-secret")
 
@@ -143,6 +151,17 @@ def current_user():
     }
 
 
+def _get_csrf_token():
+    """Per-session token embedded as a hidden field in every form and checked
+    on every state-changing request, so a malicious third-party page can't
+    trick a logged-in browser into submitting requests on the user's behalf."""
+    token = session.get("_csrf_token")
+    if not token:
+        token = secrets.token_hex(32)
+        session["_csrf_token"] = token
+    return token
+
+
 @app.context_processor
 def inject_globals():
     return {
@@ -150,7 +169,25 @@ def inject_globals():
         "firewall_mode": "Live" if APPLY_FIREWALL_RULES else "Recorded",
         "running_as_admin": is_running_as_admin(),
         "datetime": datetime,
+        "csrf_token": _get_csrf_token(),
     }
+
+
+# ── CSRF protection ──────────────────────────────────────────────────────────
+# /api/agent/* routes are excluded: they're authenticated with a Bearer token
+# by agent.py (a script, not a browser), never carry the session cookie, and
+# so aren't reachable by a cross-site form/script in the first place.
+
+@app.before_request
+def enforce_csrf():
+    if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
+        return
+    if request.path.startswith("/api/agent/"):
+        return
+    submitted = request.form.get("csrf_token", "")
+    expected = session.get("_csrf_token", "")
+    if not submitted or not expected or not secrets.compare_digest(submitted, expected):
+        return Response("CSRF token missing or invalid. Please refresh the page and try again.", status=400)
 
 
 # ── Application-level IP blocking ────────────────────────────────────────────
@@ -205,9 +242,24 @@ def init_db():
             email TEXT,
             password TEXT NOT NULL,
             role TEXT NOT NULL,
-            created_at DATETIME NOT NULL DEFAULT (datetime('now', 'localtime'))
+            created_at DATETIME NOT NULL DEFAULT (datetime('now', 'localtime')),
+            failed_attempts INTEGER NOT NULL DEFAULT 0,
+            locked_until DATETIME NULL,
+            totp_secret TEXT NULL,
+            totp_enabled INTEGER NOT NULL DEFAULT 0
         );
         """)
+        # Migration for databases created before the lockout/2FA columns existed
+        for ddl in (
+            "ALTER TABLE users ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN locked_until DATETIME NULL",
+            "ALTER TABLE users ADD COLUMN totp_secret TEXT NULL",
+            "ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0",
+        ):
+            try:
+                conn.execute(ddl)
+            except sqlite3.OperationalError:
+                pass  # column already exists
         conn.execute("""
         CREATE TABLE IF NOT EXISTS firewall_rules (
             rule_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -897,6 +949,40 @@ def index():
     return redirect(url_for("login"))
 
 
+def _start_authenticated_session(user):
+    """Finish logging a user in (called directly, or after a 2FA code is verified)."""
+    session.clear()
+    session["user_id"] = user["user_id"]
+    session["username"] = user["username"]
+    session["role"] = user["role"]
+
+
+def _register_failed_login(user):
+    """Increment failed_attempts for this user and lock the account if the
+    threshold is reached. Returns True if this failure just triggered a lock."""
+    execute(
+        "UPDATE users SET failed_attempts = failed_attempts + 1 WHERE user_id = ?",
+        [user["user_id"]],
+    )
+    refreshed = fetch_one(
+        "SELECT failed_attempts FROM users WHERE user_id = ?", [user["user_id"]]
+    )
+    if refreshed and refreshed["failed_attempts"] >= MAX_LOGIN_ATTEMPTS:
+        execute(
+            "UPDATE users SET locked_until = datetime('now', 'localtime', ?) WHERE user_id = ?",
+            [f"+{LOGIN_LOCKOUT_MINUTES} minutes", user["user_id"]],
+        )
+        return True
+    return False
+
+
+def _clear_login_failures(user_id):
+    execute(
+        "UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE user_id = ?",
+        [user_id],
+    )
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -905,16 +991,87 @@ def login():
         if not username or not password:
             flash("Please enter both username and password.", "warning")
             return render_template("login.html")
+
         user = fetch_one("SELECT * FROM users WHERE username = ?", [username])
+
+        # Account temporarily locked from too many recent failed attempts?
+        if user:
+            lock_check = fetch_one(
+                """
+                SELECT CAST(ROUND((julianday(locked_until) - julianday('now','localtime')) * 1440) AS INTEGER)
+                       AS minutes_left
+                FROM users
+                WHERE user_id = ? AND locked_until IS NOT NULL AND locked_until > datetime('now','localtime')
+                """,
+                [user["user_id"]],
+            )
+            if lock_check:
+                minutes_left = max(1, lock_check["minutes_left"])
+                flash(
+                    f"This account is temporarily locked due to too many failed login "
+                    f"attempts. Try again in {minutes_left} minute(s).",
+                    "danger",
+                )
+                return render_template("login.html")
+
         if user and password_matches(user["password"], password):
-            session.clear()
-            session["user_id"] = user["user_id"]
-            session["username"] = user["username"]
-            session["role"] = user["role"]
+            _clear_login_failures(user["user_id"])
+
+            if user["totp_enabled"]:
+                # Password is correct, but 2FA is enabled — hold off on a full
+                # session until the authenticator code is verified.
+                session.clear()
+                session["pending_2fa_user_id"] = user["user_id"]
+                return redirect(url_for("verify_2fa"))
+
+            _start_authenticated_session(user)
             flash(f"Welcome back, {user['username']}.", "success")
             return redirect(url_for("dashboard"))
+
+        if user:
+            just_locked = _register_failed_login(user)
+            if just_locked:
+                flash(
+                    f"Too many failed attempts. This account has been locked for "
+                    f"{LOGIN_LOCKOUT_MINUTES} minutes.",
+                    "danger",
+                )
+                return render_template("login.html")
+
         flash("Invalid username or password.", "danger")
     return render_template("login.html")
+
+
+@app.route("/login/verify-2fa", methods=["GET", "POST"])
+def verify_2fa():
+    """Second step of login for accounts with 2FA enabled: enter the 6-digit
+    code from an authenticator app (Google Authenticator, Authy, etc.)."""
+    pending_user_id = session.get("pending_2fa_user_id")
+    if not pending_user_id:
+        return redirect(url_for("login"))
+
+    user = fetch_one("SELECT * FROM users WHERE user_id = ?", [pending_user_id])
+    if not user or not user["totp_enabled"]:
+        session.pop("pending_2fa_user_id", None)
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        code = request.form.get("code", "").strip().replace(" ", "")
+        totp = pyotp.TOTP(user["totp_secret"])
+        if code and totp.verify(code, valid_window=1):
+            session.pop("pending_2fa_user_id", None)
+            _start_authenticated_session(user)
+            flash(f"Welcome back, {user['username']}.", "success")
+            return redirect(url_for("dashboard"))
+        flash("Invalid or expired authentication code. Please try again.", "danger")
+
+    return render_template("verify_2fa.html", username=user["username"])
+
+
+@app.route("/login/verify-2fa/cancel")
+def cancel_2fa_login():
+    session.pop("pending_2fa_user_id", None)
+    return redirect(url_for("login"))
 
 
 @app.route("/logout")
@@ -922,6 +1079,86 @@ def logout():
     session.clear()
     flash("You have been signed out.", "info")
     return redirect(url_for("login"))
+
+
+# ── Self-service Two-Factor Authentication (TOTP) ───────────────────────────
+
+def _qr_code_data_uri(provisioning_uri):
+    img = qrcode.make(provisioning_uri)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    encoded = base64.b64encode(buf.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
+@app.route("/account/security", methods=["GET"])
+@login_required
+def account_security():
+    user = fetch_one(
+        "SELECT * FROM users WHERE user_id = ?", [session["user_id"]]
+    )
+    if user["totp_enabled"]:
+        return render_template("account_security.html", enabled=True)
+
+    # Not enabled yet — reuse a pending secret already generated this session
+    # (so refreshing the page doesn't invalidate the QR code the user just scanned).
+    secret = session.get("pending_totp_secret")
+    if not secret:
+        secret = pyotp.random_base32()
+        session["pending_totp_secret"] = secret
+
+    provisioning_uri = pyotp.totp.TOTP(secret).provisioning_uri(
+        name=user["username"], issuer_name=TOTP_ISSUER_NAME
+    )
+    qr_data_uri = _qr_code_data_uri(provisioning_uri)
+    return render_template(
+        "account_security.html",
+        enabled=False,
+        secret=secret,
+        qr_data_uri=qr_data_uri,
+    )
+
+
+@app.route("/account/security/enable", methods=["POST"])
+@login_required
+def account_security_enable():
+    secret = session.get("pending_totp_secret")
+    code = request.form.get("code", "").strip().replace(" ", "")
+    if not secret:
+        flash("Your 2FA setup session expired. Please start again.", "warning")
+        return redirect(url_for("account_security"))
+
+    totp = pyotp.TOTP(secret)
+    if not code or not totp.verify(code, valid_window=1):
+        flash("That code didn't match. Scan the QR code again and try the current code.", "danger")
+        return redirect(url_for("account_security"))
+
+    execute(
+        "UPDATE users SET totp_secret = ?, totp_enabled = 1 WHERE user_id = ?",
+        [secret, session["user_id"]],
+    )
+    session.pop("pending_totp_secret", None)
+    flash("Two-factor authentication is now enabled on your account.", "success")
+    return redirect(url_for("account_security"))
+
+
+@app.route("/account/security/disable", methods=["POST"])
+@login_required
+def account_security_disable():
+    password = request.form.get("password", "")
+    user = fetch_one(
+        "SELECT * FROM users WHERE user_id = ?", [session["user_id"]]
+    )
+    if not user or not password_matches(user["password"], password):
+        flash("Incorrect password. Two-factor authentication was not disabled.", "danger")
+        return redirect(url_for("account_security"))
+
+    execute(
+        "UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE user_id = ?",
+        [session["user_id"]],
+    )
+    flash("Two-factor authentication has been disabled on your account.", "info")
+    return redirect(url_for("account_security"))
 
 
 @app.route("/dashboard")

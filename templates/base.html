@@ -141,6 +141,7 @@
         <p>Specify the IP address of the simulated host to generate network traffic events.</p>
         
         <form method="post" action="{{ url_for('simulate_attack') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div style="margin-bottom: 20px;">
                 <label for="attackerIpInput" style="display: block; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 6px;">Attacker IP Address</label>
                 <input type="text" name="attacker_ip" id="attackerIpInput" class="form-control" value="192.168.1.99" placeholder="e.g. 192.168.1.99" required style="background: var(--bg-deep); border: 1px solid var(--border-bright); color: var(--text-primary); border-radius: 8px; padding: 8px 12px; width: 100%;">
@@ -165,6 +166,7 @@
         <p>Are you sure you want to unblock <strong id="unblockIpText" style="color: var(--accent-green); font-family: monospace;"></strong>? This IP will immediately be removed from the blocked list.</p>
         
         <form method="post" action="{{ url_for('unblock_ip') }}" id="unblockForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="ip_address" id="unblockIpField" value="">
             
             <div class="modal-actions">
@@ -195,6 +197,17 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     lucide.createIcons();
+
+    // Password show/hide toggle (login + account security forms)
+    window.togglePasswordVisibility = function(inputId, btn) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        const showing = input.type === 'text';
+        input.type = showing ? 'password' : 'text';
+        btn.innerHTML = '<i data-lucide="' + (showing ? 'eye' : 'eye-off') + '"></i>';
+        btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+        lucide.createIcons();
+    };
 
     // Real-time clock
     (function updateClock() {
