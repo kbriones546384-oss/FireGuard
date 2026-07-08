@@ -1787,19 +1787,53 @@ def _verify_agent_token(req):
     return fetch_one("SELECT * FROM endpoints WHERE agent_token = ?", [token])
 
 
-# ── Agent auth helper ───────────────────────────────────────────────────────
-
-def _verify_agent_token(req):
-    """Extract and validate the Bearer token from an agent request.
-    Returns the endpoint row dict if valid, None otherwise."""
-    auth = req.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        return None
-    token = auth[7:].strip()
-    return fetch_one("SELECT * FROM endpoints WHERE agent_token = ?", [token])
-
-
 # ── Agent API routes (called by agent.py on each endpoint machine) ───────────
+
+@app.route("/api/agent/register", methods=["POST"])
+def api_agent_register():
+    """Self-registration: agent.py calls this once, with the shared
+    Global Registration Key (shown on the /endpoints page to Administrators),
+    instead of an admin manually creating the endpoint and pasting a token.
+    Idempotent by hostname — re-running the installer on the same machine
+    returns its existing token rather than creating a duplicate row."""
+    data = request.get_json(silent=True) or {}
+    submitted_key = str(data.get("registration_key", ""))
+    if not submitted_key or submitted_key != GLOBAL_REGISTRATION_KEY:
+        return jsonify({"error": "Invalid or missing registration key"}), 401
+
+    hostname = str(data.get("hostname", "")).strip()[:100]
+    if not hostname:
+        return jsonify({"error": "hostname is required"}), 400
+
+    ip_address    = str(data.get("ip_address", ""))[:45] or None
+    mac_address   = str(data.get("mac_address", ""))[:50] or None
+    os_info       = str(data.get("os_info", ""))[:200] or None
+    agent_version = str(data.get("agent_version", ""))[:20] or None
+
+    existing = fetch_one("SELECT * FROM endpoints WHERE hostname = ?", [hostname])
+    if existing:
+        execute(
+            """
+            UPDATE endpoints
+            SET ip_address = ?, mac_address = ?, os_info = ?, agent_version = ?
+            WHERE endpoint_id = ?
+            """,
+            [ip_address, mac_address, os_info, agent_version, existing["endpoint_id"]],
+        )
+        return jsonify({"agent_token": existing["agent_token"], "endpoint_id": existing["endpoint_id"]})
+
+    token = secrets.token_hex(20)
+    execute(
+        """
+        INSERT INTO endpoints
+            (hostname, ip_address, agent_token, os_info, mac_address, agent_version, status)
+        VALUES (?, ?, ?, ?, ?, ?, 'Offline')
+        """,
+        [hostname, ip_address, token, os_info, mac_address, agent_version],
+    )
+    new_row = fetch_one("SELECT endpoint_id FROM endpoints WHERE agent_token = ?", [token])
+    return jsonify({"agent_token": token, "endpoint_id": new_row["endpoint_id"]})
+
 
 @app.route("/api/agent/heartbeat", methods=["POST"])
 def api_agent_heartbeat():
@@ -1931,7 +1965,9 @@ def endpoints():
         "endpoints.html",
         endpoints=all_endpoints,
         rules=all_rules,
-        last_token=last_token
+        last_token=last_token,
+        server_lan_url=request.host_url.rstrip("/"),
+        registration_key=GLOBAL_REGISTRATION_KEY,
     )
 
 

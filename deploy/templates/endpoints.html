@@ -60,6 +60,47 @@
     </div>
 </div>
 
+<!-- ── Self-registration info (for the agent installer on other machines) ─── -->
+<div class="panel" style="margin-bottom:24px;">
+    <div class="panel-header"><h2>Endpoint Self-Registration</h2></div>
+    <div style="padding: 4px 4px 20px;">
+        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 14px;">
+            Run the FireGuard Agent installer on any Windows machine and enter these
+            two values — the agent will register itself automatically, no manual
+            token copy-paste required.
+        </p>
+        <div style="display:flex; gap:20px; flex-wrap:wrap;">
+            <div style="flex:1; min-width:260px;">
+                <span class="form-label" id="serverLanUrlLabel">Server URL</span>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <code id="serverLanUrl" aria-labelledby="serverLanUrlLabel" style="background: var(--bg-deep); border: 1px solid var(--border-bright);
+                          border-radius: 8px; padding: 8px 12px; font-size: 0.88rem; flex:1;">{{ server_lan_url }}</code>
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            onclick="navigator.clipboard.writeText('{{ server_lan_url }}');this.innerHTML='<i data-lucide=\'check\'></i>';lucide.createIcons();">
+                        <i data-lucide="copy"></i>
+                    </button>
+                </div>
+            </div>
+            <div style="flex:1; min-width:260px;">
+                <span class="form-label" id="regKeyLabel">Global Registration Key</span>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <code id="regKey" aria-labelledby="regKeyLabel" style="background: var(--bg-deep); border: 1px solid var(--border-bright);
+                          border-radius: 8px; padding: 8px 12px; font-size: 0.88rem; flex:1;">{{ registration_key }}</code>
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            onclick="navigator.clipboard.writeText('{{ registration_key }}');this.innerHTML='<i data-lucide=\'check\'></i>';lucide.createIcons();">
+                        <i data-lucide="copy"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <p style="margin-top:12px; font-size:.78rem; color:var(--text-muted);">
+            This is your public Render URL, so the agent can run from any machine with
+            internet access. Change the key in <code>fireguard_settings.json</code>
+            (<code>global_registration_key</code>) if needed.
+        </p>
+    </div>
+</div>
+
 <!-- ── Token banner (shown only right after registration) ─────────────────── -->
 {% if last_token %}
 <div class="alert alert-success fade show" role="alert"
