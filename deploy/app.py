@@ -19,6 +19,7 @@ from functools import wraps
 import psutil
 import pyotp
 import qrcode
+import requests
 import sqlite3
 from flask import (
     Flask,
@@ -108,6 +109,14 @@ MAX_LOGIN_ATTEMPTS = 5          # wrong passwords allowed before an account is l
 LOGIN_LOCKOUT_MINUTES = 15      # how long a locked account stays locked
 TOTP_ISSUER_NAME = "FireGuard"  # shown in the authenticator app next to the account name
 
+# ── reCAPTCHA v2 (Checkbox) on the login page ───────────────────────────────
+# Defaults are Google's published "always passes" test keys (safe to commit,
+# documented at https://developers.google.com/recaptcha/docs/faq) so login
+# works out of the box in dev. Set real keys via env vars before a public
+# demo/submission — the test keys show a "for testing purposes only" watermark.
+RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY", "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI")
+RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY", "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe")
+
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "fireguard-dev-secret")
 
@@ -170,7 +179,23 @@ def inject_globals():
         "running_as_admin": is_running_as_admin(),
         "datetime": datetime,
         "csrf_token": _get_csrf_token(),
+        "recaptcha_site_key": RECAPTCHA_SITE_KEY,
     }
+
+
+def _verify_recaptcha(response_token):
+    """Check a reCAPTCHA v2 checkbox response with Google's siteverify API."""
+    if not response_token:
+        return False
+    try:
+        r = requests.post(
+            "https://www.google.com/recaptcha/api/siteverify",
+            data={"secret": RECAPTCHA_SECRET_KEY, "response": response_token},
+            timeout=8,
+        )
+        return bool(r.json().get("success"))
+    except Exception:
+        return False
 
 
 # ── CSRF protection ──────────────────────────────────────────────────────────
@@ -990,6 +1015,10 @@ def login():
         password = request.form.get("password", "")[:200]
         if not username or not password:
             flash("Please enter both username and password.", "warning")
+            return render_template("login.html")
+
+        if not _verify_recaptcha(request.form.get("g-recaptcha-response", "")):
+            flash("Please complete the reCAPTCHA verification.", "warning")
             return render_template("login.html")
 
         user = fetch_one("SELECT * FROM users WHERE username = ?", [username])

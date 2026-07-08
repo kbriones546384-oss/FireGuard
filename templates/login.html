@@ -33,6 +33,9 @@
                     </button>
                 </div>
             </div>
+            <div style="display:flex; justify-content:center; margin: 4px 0 8px;">
+                <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
+            </div>
             <button class="btn btn-brand btn-lg w-100" type="submit" id="loginBtn">
                 <i data-lucide="shield-check"></i>
                 Sign in to FireGuard
@@ -40,6 +43,10 @@
         </form>
     </div>
 </section>
+{% endblock %}
+
+{% block head %}
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
 {% endblock %}
 
 {% block scripts %}
