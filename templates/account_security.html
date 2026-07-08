@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Two-Factor Authentication · FireGuard{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div class="page-heading-left">
+        <p class="eyebrow">Account security</p>
+        <h1>Two-Factor Authentication</h1>
+    </div>
+</div>
+
+<section class="content-grid">
+    {% if enabled %}
+    <div class="panel">
+        <div class="panel-header"><h2>Status</h2></div>
+        <div style="padding: 4px 4px 20px;">
+            <p style="display:flex; align-items:center; gap:8px; color: var(--accent-green); font-weight:600;">
+                <i data-lucide="shield-check"></i>
+                Two-factor authentication is enabled on your account.
+            </p>
+            <p style="color: var(--text-secondary); font-size: 0.88rem;">
+                Every sign-in now requires your password plus a 6-digit code from your
+                authenticator app (Google Authenticator, Microsoft Authenticator, Authy, etc.).
+            </p>
+        </div>
+
+        <form method="post" action="{{ url_for('account_security_disable') }}" class="stack-form" style="max-width: 360px;">
+            <div>
+                <label class="form-label" for="password">Confirm your password to disable 2FA</label>
+                <input class="form-control" id="password" name="password" type="password"
+                       required autocomplete="current-password" placeholder="Current password">
+            </div>
+            <button class="btn btn-outline-danger" type="submit">
+                <i data-lucide="shield-off"></i>
+                Disable Two-Factor Authentication
+            </button>
+        </form>
+    </div>
+    {% else %}
+    <div class="panel">
+        <div class="panel-header"><h2>Set Up Two-Factor Authentication</h2></div>
+        <div style="padding: 4px 4px 16px; display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start;">
+            <div style="text-align:center;">
+                <img src="{{ qr_data_uri }}" alt="2FA QR Code"
+                     style="width:200px; height:200px; border-radius:10px; background:#fff; padding:8px;">
+                <p style="font-size:0.75rem; color:var(--text-muted); margin-top:8px;">Scan with your authenticator app</p>
+            </div>
+            <div style="flex:1; min-width:260px;">
+                <ol style="color: var(--text-secondary); font-size: 0.88rem; padding-left: 18px; line-height:1.7;">
+                    <li>Install an authenticator app (Google Authenticator, Microsoft Authenticator, Authy).</li>
+                    <li>Scan the QR code, or enter this key manually:</li>
+                </ol>
+                <code style="display:block; background: var(--bg-deep); border: 1px solid var(--border-bright);
+                             border-radius: 8px; padding: 10px 12px; font-size: 0.9rem; letter-spacing: 1px;
+                             word-break: break-all; margin-bottom: 16px;">{{ secret }}</code>
+
+                <form method="post" action="{{ url_for('account_security_enable') }}" class="stack-form">
+                    <div>
+                        <label class="form-label" for="code">Enter the 6-digit code to confirm</label>
+                        <input class="form-control" id="code" name="code" required
+                               autocomplete="one-time-code" inputmode="numeric"
+                               pattern="[0-9]{6}" maxlength="6" minlength="6" placeholder="123456">
+                    </div>
+                    <button class="btn btn-brand" type="submit">
+                        <i data-lucide="shield-check"></i>
+                        Enable Two-Factor Authentication
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+
+*.log
+
+tunnel.log
+tunnel.err
+flask.log
+flask.err.log
+
+.vscode/
+
+.env
+
+~$*.docx

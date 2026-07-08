@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Two-Factor Verification · FireGuard{% endblock %}
+
+{% block content %}
+<section class="login-shell">
+    <div class="login-bg-grid"></div>
+    <div class="login-bg-glow"></div>
+
+    <div class="login-panel">
+        <div class="brand-lockup" style="display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 20px;">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="FireGuard Logo" style="height: 140px; width: auto; filter: drop-shadow(0 0 12px rgba(255, 78, 0, 0.35));">
+            <h2 style="margin-top: 12px; margin-bottom: 4px;">Two-Factor Verification</h2>
+            <p style="color: var(--text-secondary); font-size: 0.88rem;">
+                Signed in as <strong>{{ username }}</strong> — enter the 6-digit code from
+                your authenticator app.
+            </p>
+        </div>
+
+        <form method="post" class="login-form" id="verify2faForm">
+            <div>
+                <label class="form-label" for="code">Authentication Code</label>
+                <input class="form-control form-control-lg" id="code" name="code"
+                       required autofocus autocomplete="one-time-code" inputmode="numeric"
+                       pattern="[0-9]{6}" maxlength="6" minlength="6"
+                       placeholder="123456" style="letter-spacing: 6px; text-align: center;">
+            </div>
+            <button class="btn btn-brand btn-lg w-100" type="submit" id="verifyBtn">
+                <i data-lucide="shield-check"></i>
+                Verify &amp; Continue
+            </button>
+        </form>
+
+        <div style="text-align:center; margin-top: 16px;">
+            <a href="{{ url_for('cancel_2fa_login') }}" style="font-size: 0.85rem; color: var(--text-secondary);">
+                Cancel and sign in as a different user
+            </a>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('verify2faForm').addEventListener('submit', function() {
+    const btn = document.getElementById('verifyBtn');
+    btn.innerHTML = '<i data-lucide="loader-2" class="spin"></i> Verifying…';
+    btn.disabled = true;
+    lucide.createIcons();
+});
+</script>
+<style>
+.spin { animation: spin .8s linear infinite; display:inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}

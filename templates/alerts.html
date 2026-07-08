@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Alerts · FireGuard{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div class="page-heading-left">
+        <p class="eyebrow">Detected events</p>
+        <h1>Alerts &amp; Blocked IPs</h1>
+    </div>
+</div>
+
+<section class="content-grid two-column" style="align-items: start;">
+
+    <!-- ── Left: Security Alerts ──────────────────────────────────────── -->
+    <div class="panel" style="display:flex; flex-direction:column; align-self:start;">
+        <div class="panel-header">
+            <h2>Security Alerts <span style="color:var(--text-muted);font-weight:400;">({{ total_alerts }} total)</span></h2>
+        </div>
+
+        <div class="stack-list">
+            {% for alert in alerts %}
+            {% set sev = alert_severity(alert.alert_type) %}
+            <div class="stack-item">
+                <span class="stack-item-icon {{ 'danger' if sev == 'HIGH' else ('warning' if sev == 'WARNING' else 'info') }}">
+                    <i data-lucide="{{ alert_icon(alert.alert_type) }}"></i>
+                </span>
+                <div class="stack-item-body">
+                    <strong>{{ alert.alert_type }}</strong>
+                    <span class="severity-badge {{ sev|lower }}">{{ sev }}</span>
+                    <p>{{ alert.description }}</p>
+                    {% if alert.ip_address %}
+                    <span class="stack-item-ip">{{ alert.ip_address }}</span>
+                    {% endif %}
+                </div>
+                <span class="stack-item-time">{{ alert.alert_time }}</span>
+            </div>
+            {% else %}
+            <p class="empty-state">No alerts recorded yet.</p>
+            {% endfor %}
+        </div>
+
+        <!-- Alerts pagination strip -->
+        <div style="display:flex; align-items:center; justify-content:space-between;
+                    padding:10px 16px; border-top:1px solid var(--border);
+                    background:var(--bg-raised); border-radius:0 0 14px 14px; margin-top:auto;">
+            <span style="font-size:.78rem; color:var(--text-muted);">
+                Page {{ page }} of {{ total_pages }}
+            </span>
+            <div style="display:flex; gap:6px;">
+                <a class="btn btn-sm btn-outline-secondary {% if page <= 1 %}disabled{% endif %}"
+                   href="{{ url_for('alerts', page=page-1, ip_page=ip_page) }}"
+                   style="padding:4px 10px; font-size:.78rem; border-radius:7px;">
+                    <i data-lucide="chevron-left" style="width:13px;height:13px;"></i> Prev
+                </a>
+                <a class="btn btn-sm btn-outline-secondary {% if page >= total_pages %}disabled{% endif %}"
+                   href="{{ url_for('alerts', page=page+1, ip_page=ip_page) }}"
+                   style="padding:4px 10px; font-size:.78rem; border-radius:7px;">
+                    Next <i data-lucide="chevron-right" style="width:13px;height:13px;"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Right: Blocked IP History ──────────────────────────────────── -->
+    <div class="panel" style="display:flex; flex-direction:column; align-self:start;">
+        <div class="panel-header">
+            <h2>Blocked IPs <span style="color:var(--text-muted);font-weight:400;">({{ total_ips }} total)</span></h2>
+            {% if current_user.role == 'Administrator' %}
+            <button type="button" class="btn btn-sm" onclick="openAttackModal(event)"
+                    style="background:linear-gradient(135deg,#dc2626,#991b1b);color:#fff;
+                           border:none;font-size:.75rem;font-weight:600;padding:.3rem .7rem;
+                           display:inline-flex;align-items:center;gap:4px; border-radius:8px;">
+                <i data-lucide="siren" style="height:13px;width:13px;"></i>
+                Simulate Attack
+            </button>
+            {% endif %}
+        </div>
+
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>IP Address</th>
+                        <th>Reason</th>
+                        <th>Blocked At</th>
+                        {% if current_user.role == 'Administrator' %}
+                        <th style="width:80px;">Action</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ip in blocked_ips %}
+                    <tr>
+                        <td>
+                            <span style="font-family:monospace;font-size:.82rem;color:#f87171;">{{ ip.ip_address }}</span>
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    style="padding:.15rem .45rem;font-size:.65rem;margin-left:5px;"
+                                    onclick="navigator.clipboard.writeText('{{ ip.ip_address }}');this.textContent='✓'"
+                                    title="Copy IP">Copy</button>
+                        </td>
+                        <td style="font-size:.78rem;color:var(--text-secondary);max-width:140px;word-break:break-word;">{{ ip.reason }}</td>
+                        <td style="font-size:.75rem;color:var(--text-muted);white-space:nowrap;">{{ ip.blocked_at }}</td>
+                        {% if current_user.role == 'Administrator' %}
+                        <td>
+                            <button type="button" class="btn btn-sm"
+                                    style="background:#16a34a;color:#fff;border:none;
+                                           font-size:.7rem;padding:.25rem .55rem;font-weight:600;border-radius:6px;"
+                                    onclick="openUnblockModal('{{ ip.ip_address }}')">
+                                ✓ Unblock
+                            </button>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="text-center text-secondary py-4">No blocked IPs yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Blocked IPs pagination strip -->
+        <div style="display:flex; align-items:center; justify-content:space-between;
+                    padding:10px 16px; border-top:1px solid var(--border);
+                    background:var(--bg-raised); border-radius:0 0 14px 14px; margin-top:auto;">
+            <span style="font-size:.78rem; color:var(--text-muted);">
+                Page {{ ip_page }} of {{ total_ip_pages }}
+            </span>
+            <div style="display:flex; gap:6px;">
+                <a class="btn btn-sm btn-outline-secondary {% if ip_page <= 1 %}disabled{% endif %}"
+                   href="{{ url_for('alerts', page=page, ip_page=ip_page-1) }}"
+                   style="padding:4px 10px; font-size:.78rem; border-radius:7px;">
+                    <i data-lucide="chevron-left" style="width:13px;height:13px;"></i> Prev
+                </a>
+                <a class="btn btn-sm btn-outline-secondary {% if ip_page >= total_ip_pages %}disabled{% endif %}"
+                   href="{{ url_for('alerts', page=page, ip_page=ip_page+1) }}"
+                   style="padding:4px 10px; font-size:.78rem; border-radius:7px;">
+                    Next <i data-lucide="chevron-right" style="width:13px;height:13px;"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+</section>
+{% endblock %}
+
+

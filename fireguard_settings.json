@@ -1,0 +1,4 @@
+{
+  "apply_firewall_rules": false,
+  "global_registration_key": "fireguard-register-token"
+}

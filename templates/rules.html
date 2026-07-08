@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+{% block title %}Firewall Rules · FireGuard{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div class="page-heading-left">
+        <p class="eyebrow">Administrator controls</p>
+        <h1>Firewall Rules</h1>
+    </div>
+</div>
+
+
+<section class="content-grid form-and-table">
+    <!-- Create rule form -->
+    <div class="panel">
+        <div class="panel-header"><h2>Create Rule</h2></div>
+        <form method="post" class="stack-form">
+            <div>
+                <label class="form-label" for="rule_name">Rule Name</label>
+                <input class="form-control" id="rule_name" name="rule_name" required maxlength="100" placeholder="Block RDP attempts">
+            </div>
+            <div>
+                <label class="form-label" for="ip_address">IP Address</label>
+                <input class="form-control" id="ip_address" name="ip_address" maxlength="45" placeholder="192.168.1.20">
+                <span class="form-help">Leave blank to match any IP.</span>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="port">Port</label>
+                    <input class="form-control" id="port" name="port" type="number" min="1" max="65535" placeholder="3389">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="protocol">Protocol</label>
+                    <select class="form-select" id="protocol" name="protocol">
+                        <option>TCP</option>
+                        <option>UDP</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="action_type">Action</label>
+                    <select class="form-select" id="action_type" name="action_type">
+                        <option>BLOCK</option>
+                        <option>ALLOW</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="status">Status</label>
+                    <select class="form-select" id="status" name="status">
+                        <option>Active</option>
+                        <option>Inactive</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn btn-brand" type="submit">
+                <i data-lucide="plus"></i>
+                Add Rule
+            </button>
+        </form>
+    </div>
+
+    <!-- Rules table -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Configured Rules</h2>
+            {# ── FIX: Search bar ── #}
+            <form method="get" action="{{ url_for('rules') }}" style="display:flex;gap:8px;align-items:center;">
+                <div style="position:relative;">
+                    <i data-lucide="search" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text-muted);pointer-events:none;"></i>
+                    <input class="form-control form-control-sm" type="text" name="q" value="{{ search }}" placeholder="Search rules…" style="padding-left:30px;min-width:180px;">
+                </div>
+                <button class="btn btn-sm btn-outline-secondary" type="submit"><i data-lucide="filter"></i></button>
+                {% if search %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('rules') }}"><i data-lucide="x"></i></a>{% endif %}
+            </form>
+        </div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>IP</th>
+                        <th>Port</th>
+                        <th>Protocol</th>
+                        <th>Action</th>
+                        <th>Status</th>
+                        <th title="How many times this rule matched traffic logs">Hits 🎯</th>
+                        <th title="Is this rule present in Windows Defender Firewall?">Windows 🛡️</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rule in rules %}
+                    <tr class="row-{{ rule.action_type | lower }}">
+                        <td>
+                            <strong>{{ rule.rule_name }}</strong>
+                            <span class="table-subtext">by {{ rule.created_by_name or 'System' }}</span>
+                        </td>
+                        <td style="font-family:monospace;font-size:.8rem;">{{ rule.ip_address or 'Any' }}</td>
+                        <td>{{ rule.port or 'Any' }}</td>
+                        <td>{{ rule.protocol }}</td>
+                        <td><span class="status-badge {{ rule.action_type | lower }}">{{ rule.action_type }}</span></td>
+                        <td><span class="status-badge {{ rule.status | lower }}">{{ rule.status }}</span></td>
+                        <td>
+                            {# ── Hits counter: how many traffic logs match this rule ── #}
+                            {% set hits = rule.hit_count | default(0) %}
+                            <span class="hit-badge {% if hits == 0 %}hit-zero{% elif hits < 5 %}hit-low{% else %}hit-high{% endif %}">
+                                {{ hits }} hit{{ 's' if hits != 1 else '' }}
+                            </span>
+                        </td>
+                        <td>
+                            {# ── WF status badge (filled by JS) ── #}
+                            <span class="wf-badge" id="wf-{{ rule.rule_id }}" data-rule-id="{{ rule.rule_id }}"
+                                  title="Checking Windows Firewall…">
+                                <span class="wf-spinner">⋯</span>
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            <div style="display:flex;gap:6px;justify-content:flex-end;">
+                                <form method="post" action="{{ url_for('test_rule', rule_id=rule.rule_id) }}" style="display:inline;">
+                                    <button class="btn btn-sm btn-outline-success icon-button"
+                                            type="submit" title="Simulate traffic (Test Rule)">
+                                        <i data-lucide="play"></i>
+                                    </button>
+                                </form>
+                                <form method="post" action="{{ url_for('apply_rule_to_firewall', rule_id=rule.rule_id) }}" style="display:inline;">
+                                    <button class="btn btn-sm btn-outline-primary icon-button"
+                                            type="submit" title="Apply to Windows Firewall">
+                                        <i data-lucide="shield-check"></i>
+                                    </button>
+                                </form>
+                                <a class="btn btn-sm btn-outline-secondary icon-button"
+                                   href="{{ url_for('edit_rule', rule_id=rule.rule_id) }}" title="Edit rule">
+                                    <i data-lucide="pencil"></i>
+                                </a>
+                                <button class="btn btn-sm btn-outline-danger icon-button"
+                                        type="button" title="Delete rule"
+                                        onclick="showDeleteModal({{ rule.rule_id }}, '{{ rule.rule_name | e }}')">
+                                    <i data-lucide="trash-2"></i>
+                                </button>
+                            </div>
+                        </td>
+
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="9" class="text-center text-secondary py-4">No firewall rules yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- Delete confirmation modal -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal-card">
+        <h3><i data-lucide="trash-2" style="display:inline-block;vertical-align:middle;margin-right:8px;color:var(--accent-red);height:20px;width:20px;"></i>Delete Rule</h3>
+        <p>Are you sure you want to delete <strong id="deleteRuleName"></strong>? This action cannot be undone.</p>
+        <div class="modal-actions">
+            <button class="btn btn-outline-secondary btn-sm" onclick="closeDeleteModal()">Cancel</button>
+            <form id="deleteForm" method="post">
+                <button class="btn btn-danger btn-sm" type="submit">
+                    <i data-lucide="trash-2"></i>
+                    Delete
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ── Windows Firewall status badge ── */
+.wf-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+    cursor: default;
+    transition: all 0.3s ease;
+}
+.wf-badge.wf-yes {
+    background: rgba(16,185,129,0.15);
+    color: #10b981;
+    border: 1px solid rgba(16,185,129,0.3);
+}
+.wf-badge.wf-no {
+    background: rgba(148,163,184,0.1);
+    color: #64748b;
+    border: 1px solid rgba(148,163,184,0.2);
+}
+.wf-badge.wf-check {
+    background: rgba(59,130,246,0.1);
+    color: #60a5fa;
+    border: 1px solid rgba(59,130,246,0.2);
+    animation: pulse-blue 1.2s infinite;
+}
+@keyframes pulse-blue {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+</style>
+<script>
+// ── Windows Firewall status badges ─────────────────────────
+function showDeleteModal(ruleId, ruleName) {
+    document.getElementById('deleteRuleName').textContent = '"' + ruleName + '"';
+    document.getElementById('deleteForm').action = '/rules/' + ruleId + '/delete';
+    document.getElementById('deleteModal').classList.add('show');
+}
+function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.remove('show');
+}
+document.getElementById('deleteModal').addEventListener('click', function(e) {
+    if (e.target === this) closeDeleteModal();
+});
+
+// Check each rule's Windows Firewall status
+document.querySelectorAll('.wf-badge[data-rule-id]').forEach(badge => {
+    const ruleId = badge.dataset.ruleId;
+    badge.classList.add('wf-check');
+    badge.innerHTML = '<span>Checking…</span>';
+
+    fetch(`/api/rules/${ruleId}/wf-status`)
+        .then(r => r.json())
+        .then(data => {
+            badge.classList.remove('wf-check');
+            if (data.exists) {
+                badge.classList.add('wf-yes');
+                badge.title = 'This rule is active in Windows Defender Firewall';
+                badge.innerHTML = '✔ In Windows';
+            } else {
+                badge.classList.add('wf-no');
+                badge.title = 'Not found in Windows Firewall (Recorded Mode or not yet applied)';
+                badge.innerHTML = '— Not in WF';
+            }
+        })
+        .catch(() => {
+            badge.classList.remove('wf-check');
+            badge.classList.add('wf-no');
+            badge.innerHTML = '? Unknown';
+        });
+});
+</script>
+{% endblock %}

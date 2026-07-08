@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Edit Rule · FireGuard{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div class="page-heading-left">
+        <p class="eyebrow">Administrator controls</p>
+        <h1>Edit Rule</h1>
+    </div>
+    <a class="btn btn-outline-secondary" href="{{ url_for('rules') }}">
+        <i data-lucide="arrow-left"></i>
+        Back to Rules
+    </a>
+</div>
+
+<section class="panel narrow-panel">
+    <div class="panel-header">
+        <h2>
+            <i data-lucide="pencil" style="display:inline-block;vertical-align:middle;height:16px;width:16px;margin-right:6px;color:var(--accent-blue);"></i>
+            Editing: {{ rule.rule_name }}
+        </h2>
+    </div>
+    <form method="post" class="stack-form">
+        <div>
+            <label class="form-label" for="rule_name">Rule Name</label>
+            <input class="form-control" id="rule_name" name="rule_name" value="{{ rule.rule_name }}" required maxlength="100">
+        </div>
+        <div>
+            <label class="form-label" for="ip_address">IP Address</label>
+            <input class="form-control" id="ip_address" name="ip_address" value="{{ rule.ip_address or '' }}" maxlength="45" placeholder="192.168.1.20">
+            <span class="form-help">Leave blank to match any IP.</span>
+        </div>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label" for="port">Port</label>
+                <input class="form-control" id="port" name="port" type="number" min="1" max="65535" value="{{ rule.port or '' }}">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="protocol">Protocol</label>
+                <select class="form-select" id="protocol" name="protocol">
+                    <option {% if rule.protocol == 'TCP' %}selected{% endif %}>TCP</option>
+                    <option {% if rule.protocol == 'UDP' %}selected{% endif %}>UDP</option>
+                </select>
+            </div>
+        </div>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label" for="action_type">Action</label>
+                <select class="form-select" id="action_type" name="action_type">
+                    <option {% if rule.action_type == 'BLOCK' %}selected{% endif %}>BLOCK</option>
+                    <option {% if rule.action_type == 'ALLOW' %}selected{% endif %}>ALLOW</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="status">Status</label>
+                <select class="form-select" id="status" name="status">
+                    <option {% if rule.status == 'Active' %}selected{% endif %}>Active</option>
+                    <option {% if rule.status == 'Inactive' %}selected{% endif %}>Inactive</option>
+                </select>
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;">
+            <button class="btn btn-brand" type="submit">
+                <i data-lucide="save"></i>
+                Save Changes
+            </button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('rules') }}">Cancel</a>
+        </div>
+    </form>
+</section>
+{% endblock %}
