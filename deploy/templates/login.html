@@ -13,19 +13,19 @@
 
 
 
-        <form method="post" class="login-form" id="loginForm">
+        <form method="post" class="login-form" id="loginForm" novalidate>
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div>
                 <label class="form-label" for="username">Username</label>
-                <input class="form-control form-control-lg" id="username" name="username"
-                       required autofocus autocomplete="username" maxlength="100"
+                <input class="form-control form-control-lg{% if username_error %} error{% endif %}" id="username" name="username"
+                       autofocus autocomplete="username" maxlength="100"
                        placeholder="Enter your username">
             </div>
             <div>
                 <label class="form-label" for="password">Password</label>
                 <div class="password-field">
-                    <input class="form-control form-control-lg" id="password" name="password"
-                           type="password" required autocomplete="current-password" maxlength="200"
+                    <input class="form-control form-control-lg{% if password_error %} error{% endif %}" id="password" name="password"
+                           type="password" autocomplete="current-password" maxlength="200"
                            placeholder="••••••••">
                     <button type="button" class="password-toggle-btn" tabindex="-1"
                             aria-label="Show password" onclick="togglePasswordVisibility('password', this)">
@@ -51,7 +51,21 @@
 
 {% block scripts %}
 <script>
-document.getElementById('loginForm').addEventListener('submit', function() {
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+    const usernameEl = document.getElementById('username');
+    const passwordEl = document.getElementById('password');
+    usernameEl.classList.remove('error');
+    passwordEl.classList.remove('error');
+
+    const usernameBlank = !usernameEl.value.trim();
+    const passwordBlank = !passwordEl.value.trim();
+    if (usernameBlank || passwordBlank) {
+        e.preventDefault();
+        if (usernameBlank) usernameEl.classList.add('error');
+        if (passwordBlank) passwordEl.classList.add('error');
+        return;
+    }
+
     const btn = document.getElementById('loginBtn');
     btn.innerHTML = '<i data-lucide="loader-2" class="spin"></i> Signing in…';
     btn.disabled = true;

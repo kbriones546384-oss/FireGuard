@@ -621,6 +621,15 @@ a:hover { color: #60a5fa; }
     height: 18px;
 }
 
+/* ── Field validation state ────────────────────────────────── */
+.form-control.error {
+    border-color: #ef4444 !important;
+    background-color: rgba(239, 68, 68, 0.08) !important;
+}
+.form-control.error:focus {
+    box-shadow: 0 0 0 .2rem rgba(239, 68, 68, 0.25) !important;
+}
+
 /* ── Content grids ────────────────────────────────────────── */
 .content-grid {
     display: grid;

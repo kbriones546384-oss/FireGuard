@@ -28,10 +28,16 @@
             </div>
             <div>
                 <label class="form-label" for="password">Password</label>
-                <input class="form-control" id="password" name="password" type="password" required
-                       minlength="8" maxlength="200"
-                       title="At least 8 characters"
-                       placeholder="At least 8 characters">
+                <div class="password-field">
+                    <input class="form-control" id="password" name="password" type="password" required
+                           minlength="8" maxlength="200"
+                           title="At least 8 characters"
+                           placeholder="At least 8 characters">
+                    <button type="button" class="password-toggle-btn" tabindex="-1"
+                            aria-label="Show password" onclick="togglePasswordVisibility('password', this)">
+                        <i data-lucide="eye"></i>
+                    </button>
+                </div>
             </div>
             <div>
                 <label class="form-label" for="role">Role</label>

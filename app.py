@@ -208,6 +208,7 @@ def inject_globals():
 def _verify_recaptcha(response_token):
     """Check a reCAPTCHA v2 checkbox response with Google's siteverify API."""
     if not response_token:
+        app.logger.warning("reCAPTCHA: no g-recaptcha-response submitted with the form")
         return False
     try:
         r = requests.post(
@@ -215,8 +216,12 @@ def _verify_recaptcha(response_token):
             data={"secret": RECAPTCHA_SECRET_KEY, "response": response_token},
             timeout=8,
         )
-        return bool(r.json().get("success"))
-    except Exception:
+        result = r.json()
+        if not result.get("success"):
+            app.logger.warning(f"reCAPTCHA rejected: {result}")
+        return bool(result.get("success"))
+    except Exception as e:
+        app.logger.warning(f"reCAPTCHA verification request failed: {e}")
         return False
 
 
@@ -903,7 +908,7 @@ def login():
         password = request.form.get("password", "")[:200]
         if not username or not password:
             flash("Please enter both username and password.", "warning")
-            return render_template("login.html")
+            return render_template("login.html", username_error=not username, password_error=not password)
 
         if not _verify_recaptcha(request.form.get("g-recaptcha-response", "")):
             flash("Please complete the reCAPTCHA verification.", "warning")
@@ -920,7 +925,7 @@ def login():
                 f"attempts. Try again in {minutes_left} minute(s).",
                 "danger",
             )
-            return render_template("login.html")
+            return render_template("login.html", password_error=True)
 
         if user and password_matches(user["password"], password):
             _clear_login_failures(user["user_id"])
@@ -944,9 +949,10 @@ def login():
                     f"{LOGIN_LOCKOUT_MINUTES} minutes.",
                     "danger",
                 )
-                return render_template("login.html")
+                return render_template("login.html", password_error=True)
 
         flash("Invalid username or password.", "danger")
+        return render_template("login.html", password_error=True)
     return render_template("login.html")
 
 
