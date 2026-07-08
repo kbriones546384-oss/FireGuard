@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}User Accounts · FireGuard{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div class="page-heading-left">
+        <p class="eyebrow">Access control</p>
+        <h1>User Accounts</h1>
+    </div>
+</div>
+
+<section class="content-grid form-and-table">
+    <!-- Create user form -->
+    <div class="panel">
+        <div class="panel-header"><h2>Create User</h2></div>
+        <form method="post" class="stack-form">
+            <div>
+                <label class="form-label" for="username">Username</label>
+                <input class="form-control" id="username" name="username" required
+                       minlength="3" maxlength="50" pattern="[A-Za-z0-9_.\-]+"
+                       title="3-50 characters: letters, numbers, dots, hyphens, or underscores"
+                       placeholder="johndoe">
+            </div>
+            <div>
+                <label class="form-label" for="email">Email</label>
+                <input class="form-control" id="email" name="email" type="email" maxlength="255" placeholder="john@example.com">
+            </div>
+            <div>
+                <label class="form-label" for="password">Password</label>
+                <input class="form-control" id="password" name="password" type="password" required
+                       minlength="8" maxlength="200"
+                       title="At least 8 characters"
+                       placeholder="At least 8 characters">
+            </div>
+            <div>
+                <label class="form-label" for="role">Role</label>
+                <select class="form-select" id="role" name="role">
+                    <option>Administrator</option>
+                    <option>Security Analyst</option>
+                    <option>Viewer</option>
+                </select>
+            </div>
+            <button class="btn btn-brand" type="submit">
+                <i data-lucide="user-plus"></i>
+                Add User
+            </button>
+        </form>
+    </div>
+
+    <!-- Users table -->
+    <div class="panel">
+        <div class="panel-header"><h2>Accounts</h2></div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Created</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <span class="user-avatar" style="height:28px;width:28px;font-size:.68rem;border-radius:7px;">
+                                    {{ user.username[0].upper() }}
+                                </span>
+                                <strong>{{ user.username }}</strong>
+                            </div>
+                        </td>
+                        <td style="color:var(--text-secondary);font-size:.83rem;">{{ user.email or '—' }}</td>
+                        <td>
+                            <span class="role-badge {{ user.role | lower | replace(' ', '-') }}">
+                                {{ user.role }}
+                            </span>
+                        </td>
+                        <td style="font-size:.78rem;color:var(--text-muted);">{{ user.created_at }}</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-danger icon-button"
+                                    type="button" title="Delete user"
+                                    onclick="showUserDeleteModal({{ user.user_id }}, '{{ user.username | e }}')">
+                                <i data-lucide="trash-2"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="text-center text-secondary py-4">No users yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- Delete confirmation modal -->
+<div class="modal-overlay" id="userDeleteModal">
+    <div class="modal-card">
+        <h3><i data-lucide="user-x" style="display:inline-block;vertical-align:middle;margin-right:8px;color:var(--accent-red);height:20px;width:20px;"></i>Delete User</h3>
+        <p>Are you sure you want to delete user <strong id="deleteUserName"></strong>? This action cannot be undone.</p>
+        <div class="modal-actions">
+            <button class="btn btn-outline-secondary btn-sm" onclick="closeUserDeleteModal()">Cancel</button>
+            <form id="userDeleteForm" method="post">
+                <button class="btn btn-danger btn-sm" type="submit">
+                    <i data-lucide="trash-2"></i>
+                    Delete User
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showUserDeleteModal(userId, username) {
+    document.getElementById('deleteUserName').textContent = '"' + username + '"';
+    document.getElementById('userDeleteForm').action = '/users/' + userId + '/delete';
+    document.getElementById('userDeleteModal').classList.add('show');
+}
+function closeUserDeleteModal() {
+    document.getElementById('userDeleteModal').classList.remove('show');
+}
+document.getElementById('userDeleteModal').addEventListener('click', function(e) {
+    if (e.target === this) closeUserDeleteModal();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Traffic Logs · FireGuard{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div class="page-heading-left">
+        <p class="eyebrow">Network activity</p>
+        <h1>Traffic Logs</h1>
+    </div>
+    {% if current_user.role in ['Administrator', 'Security Analyst'] %}
+    <div class="button-group">
+        <form method="post" action="{{ url_for('scan_live_traffic') }}">
+            <button class="btn btn-brand" type="submit" id="scanBtn">
+                <i data-lucide="activity"></i>
+                Scan Live Traffic
+            </button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<section class="panel">
+    <div class="panel-header">
+        <h2>All Traffic Logs <span style="color:var(--text-muted);font-weight:400;">({{ total_logs }} total)</span></h2>
+        <button class="btn btn-outline-secondary btn-sm" onclick="location.reload()">
+            <i data-lucide="refresh-cw"></i>
+            Refresh
+        </button>
+    </div>
+
+    {# ── FIX: Search and filter bar ── #}
+    <form method="get" action="{{ url_for('logs') }}" class="log-filter-bar" id="logFilterForm">
+        <div class="log-filter-input-wrap">
+            <i data-lucide="search" class="log-filter-icon"></i>
+            <input class="form-control" type="text" name="q" id="logSearch"
+                   value="{{ search }}" placeholder="Search by IP, port…"
+                   autocomplete="off">
+        </div>
+        <select class="form-select" name="action" id="logAction" style="max-width:140px;"
+                onchange="this.form.submit()">
+            <option value="">All Actions</option>
+            <option value="BLOCK" {% if filter_action == 'BLOCK' %}selected{% endif %}>BLOCK only</option>
+            <option value="ALLOW" {% if filter_action == 'ALLOW' %}selected{% endif %}>ALLOW only</option>
+        </select>
+        <button class="btn btn-outline-secondary btn-sm" type="submit">
+            <i data-lucide="filter"></i> Filter
+        </button>
+        {% if search or filter_action %}
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('logs') }}">
+            <i data-lucide="x"></i> Clear
+        </a>
+        {% endif %}
+    </form>
+
+    {% include "_logs_table.html" %}
+
+    <div class="pagination">
+        <a class="btn btn-sm btn-outline-secondary {% if page <= 1 %}disabled{% endif %}"
+           href="{{ url_for('logs', page=page-1, q=search or none, action=filter_action or none) }}">
+            <i data-lucide="chevron-left"></i> Prev
+        </a>
+        <span class="pagination-info">Page {{ page }} of {{ total_pages }}</span>
+        <a class="btn btn-sm btn-outline-secondary {% if page >= total_pages %}disabled{% endif %}"
+           href="{{ url_for('logs', page=page+1, q=search or none, action=filter_action or none) }}">
+            Next <i data-lucide="chevron-right"></i>
+        </a>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.log-filter-bar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 12px 20px 0;
+    flex-wrap: wrap;
+}
+.log-filter-input-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+}
+.log-filter-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+.log-filter-input-wrap .form-control {
+    padding-left: 34px;
+}
+</style>
+{% endblock %}

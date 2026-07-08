@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+{% block title %}Endpoints · FireGuard{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div class="page-heading-left">
+        <p class="eyebrow">Centralized management</p>
+        <h1>Managed Endpoints</h1>
+    </div>
+    <div class="button-group">
+        <button class="btn btn-brand" onclick="document.getElementById('registerModal').classList.add('show')" id="registerEndpointBtn">
+            <i data-lucide="monitor-plus"></i>
+            Register Endpoint
+        </button>
+    </div>
+</div>
+
+<!-- ── Summary cards ──────────────────────────────────────────────────────── -->
+{% set total   = endpoints | length %}
+{% set online  = endpoints | selectattr('status', 'equalto', 'Online')  | list | length %}
+{% set offline = endpoints | selectattr('status', 'equalto', 'Offline') | list | length %}
+{% set warning = endpoints | selectattr('status', 'equalto', 'Warning') | list | length %}
+
+<div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 24px;">
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(99,102,241,0.15); color:#818cf8;">
+            <i data-lucide="monitor"></i>
+        </div>
+        <div class="stat-body">
+            <span class="stat-label">Total Endpoints</span>
+            <span class="stat-value">{{ total }}</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(16,185,129,0.15); color:#34d399;">
+            <i data-lucide="wifi"></i>
+        </div>
+        <div class="stat-body">
+            <span class="stat-label">Online</span>
+            <span class="stat-value" style="color:#34d399;">{{ online }}</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(239,68,68,0.15); color:#f87171;">
+            <i data-lucide="wifi-off"></i>
+        </div>
+        <div class="stat-body">
+            <span class="stat-label">Offline</span>
+            <span class="stat-value" style="color:#f87171;">{{ offline }}</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(234,179,8,0.15); color:#facc15;">
+            <i data-lucide="triangle-alert"></i>
+        </div>
+        <div class="stat-body">
+            <span class="stat-label">Warning</span>
+            <span class="stat-value" style="color:#facc15;">{{ warning }}</span>
+        </div>
+    </div>
+</div>
+
+<!-- ── Token banner (shown only right after registration) ─────────────────── -->
+{% if last_token %}
+<div class="alert alert-success fade show" role="alert"
+     style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);
+            border-radius:12px;padding:16px 20px;margin-bottom:20px;color:#d1fae5;">
+    <div style="display:flex;align-items:flex-start;gap:12px;">
+        <i data-lucide="key-round" style="width:20px;height:20px;color:#34d399;flex-shrink:0;margin-top:2px;"></i>
+        <div>
+            <strong style="color:#a7f3d0;">Endpoint registered! Copy this token into <code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;">agent_config.json</code> on the target machine:</strong>
+            <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
+                <code id="generatedToken"
+                      style="background:rgba(0,0,0,0.4);border:1px solid rgba(16,185,129,0.4);
+                             padding:8px 14px;border-radius:8px;font-size:.88rem;
+                             color:#6ee7b7;letter-spacing:.04em;flex:1;word-break:break-all;">{{ last_token }}</code>
+                <button onclick="navigator.clipboard.writeText('{{ last_token }}');this.innerHTML='<i data-lucide=\'check\'></i> Copied'"
+                        class="btn btn-sm"
+                        style="background:#059669;color:#fff;border:none;border-radius:8px;
+                               padding:8px 14px;font-size:.8rem;font-weight:600;white-space:nowrap;">
+                    <i data-lucide="copy"></i> Copy Token
+                </button>
+            </div>
+            <p style="margin-top:8px;font-size:.8rem;color:#6ee7b7;margin-bottom:0;">
+                ⚠️ This token is shown only once. Store it securely.
+            </p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ── Endpoints table ────────────────────────────────────────────────────── -->
+<div class="panel" style="margin-bottom:24px;">
+    <div class="panel-header">
+        <h2>Endpoint Registry</h2>
+        <span style="font-size:.78rem;color:var(--text-muted);">Auto-refreshes every 30s</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle mb-0" id="endpointsTable">
+            <thead>
+                <tr>
+                    <th>Hostname</th>
+                    <th>IP Address</th>
+                    <th>Status</th>
+                    <th>CPU</th>
+                    <th>Memory</th>
+                    <th>Connections</th>
+                    <th>Firewall</th>
+                    <th>Last Seen</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ep in endpoints %}
+                <tr>
+                    <!-- Hostname -->
+                    <td>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0;
+                                         background:{{ '#10b981' if ep.status == 'Online' else ('#facc15' if ep.status == 'Warning' else '#ef4444') }};
+                                         {{ 'box-shadow:0 0 6px #10b981;' if ep.status == 'Online' else '' }}">
+                            </span>
+                            <strong style="font-size:.9rem;">{{ ep.hostname }}</strong>
+                            {% if ep.agent_version %}
+                            <span style="font-size:.65rem; background:rgba(99,102,241,0.15); color:#a5b4fc; border:1px solid rgba(99,102,241,0.3); padding:1px 5px; border-radius:4px; font-weight:600; margin-left:4px;">
+                                v{{ ep.agent_version }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        {% if ep.os_info %}
+                        <span style="font-size:.72rem;color:var(--text-muted);display:block;margin-top:2px;">{{ ep.os_info }}</span>
+                        {% endif %}
+                    </td>
+                    <!-- IP -->
+                    <td>
+                        <span style="font-family:monospace;font-size:.82rem;color:#93c5fd;display:block;">
+                            {{ ep.ip_address or '—' }}
+                        </span>
+                        {% if ep.mac_address %}
+                        <span style="font-family:monospace;font-size:.7rem;color:var(--text-muted);display:block;margin-top:2px;">
+                            {{ ep.mac_address }}
+                        </span>
+                        {% endif %}
+                    </td>
+                    <!-- Status badge -->
+                    <td>
+                        {% if ep.status == 'Online' %}
+                        <span class="severity-badge info" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);">Online</span>
+                        {% elif ep.status == 'Warning' %}
+                        <span class="severity-badge warning">Warning</span>
+                        {% else %}
+                        <span class="severity-badge" style="background:rgba(100,116,139,0.15);color:#94a3b8;border:1px solid rgba(100,116,139,0.3);">Offline</span>
+                        {% endif %}
+                    </td>
+                    <!-- CPU bar -->
+                    <td>
+                        {% if ep.cpu_percent is not none %}
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <div style="width:60px;height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+                                <div style="width:{{ [ep.cpu_percent, 100] | min }}%;height:100%;border-radius:3px;
+                                            background:{{ '#ef4444' if ep.cpu_percent > 80 else ('#facc15' if ep.cpu_percent > 60 else '#10b981') }};
+                                            transition:width 0.4s;"></div>
+                            </div>
+                            <span style="font-size:.78rem;color:var(--text-muted);">{{ '%.1f' % ep.cpu_percent }}%</span>
+                        </div>
+                        {% else %}
+                        <span style="color:var(--text-muted);font-size:.78rem;">—</span>
+                        {% endif %}
+                    </td>
+                    <!-- Memory bar -->
+                    <td>
+                        {% if ep.memory_percent is not none %}
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <div style="width:60px;height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+                                <div style="width:{{ [ep.memory_percent, 100] | min }}%;height:100%;border-radius:3px;
+                                            background:{{ '#ef4444' if ep.memory_percent > 85 else ('#facc15' if ep.memory_percent > 70 else '#818cf8') }};
+                                            transition:width 0.4s;"></div>
+                            </div>
+                            <span style="font-size:.78rem;color:var(--text-muted);">{{ '%.1f' % ep.memory_percent }}%</span>
+                        </div>
+                        {% else %}
+                        <span style="color:var(--text-muted);font-size:.78rem;">—</span>
+                        {% endif %}
+                    </td>
+                    <!-- Connections -->
+                    <td style="font-size:.82rem;color:var(--text-secondary);">
+                        {{ ep.connection_count if ep.connection_count is not none else '—' }}
+                    </td>
+                    <!-- Firewall status -->
+                    <td>
+                        {% if ep.firewall_active is not none %}
+                            {% if ep.firewall_active %}
+                            <span style="color:#34d399;font-size:.8rem;font-weight:600;">
+                                <i data-lucide="shield-check" style="width:13px;height:13px;"></i> ON
+                            </span>
+                            {% else %}
+                            <span style="color:#f87171;font-size:.8rem;font-weight:600;">
+                                <i data-lucide="shield-off" style="width:13px;height:13px;"></i> OFF
+                            </span>
+                            {% endif %}
+                        {% else %}
+                        <span style="color:var(--text-muted);font-size:.78rem;">—</span>
+                        {% endif %}
+                    </td>
+                    <!-- Last Seen -->
+                    <td style="font-size:.75rem;color:var(--text-muted);white-space:nowrap;">
+                        {{ ep.last_seen or 'Never' }}
+                    </td>
+                    <!-- Actions -->
+                    <td>
+                        <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                            <button type="button"
+                                    class="btn btn-sm"
+                                    style="background:rgba(99,102,241,0.2);color:#a5b4fc;border:1px solid rgba(99,102,241,0.3);
+                                           font-size:.7rem;padding:.25rem .55rem;border-radius:6px;"
+                                    onclick="openPushModal({{ ep.endpoint_id }}, '{{ ep.hostname }}')"
+                                    title="Push Rules">
+                                <i data-lucide="send" style="width:11px;height:11px;"></i> Push Rules
+                            </button>
+                            <form method="post" action="{{ url_for('delete_endpoint', endpoint_id=ep.endpoint_id) }}"
+                                  onsubmit="return confirm('Remove endpoint {{ ep.hostname }}?')">
+                                <button type="submit" class="btn btn-sm"
+                                        style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.25);
+                                               font-size:.7rem;padding:.25rem .55rem;border-radius:6px;">
+                                    <i data-lucide="trash-2" style="width:11px;height:11px;"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="text-center text-secondary py-5">
+                        <i data-lucide="monitor-x" style="width:32px;height:32px;margin-bottom:8px;opacity:0.4;display:block;margin:0 auto 8px;"></i>
+                        No endpoints registered yet. Click <strong>Register Endpoint</strong> to add one.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ── Push All panel ─────────────────────────────────────────────────────── -->
+{% if rules %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>Deploy Policy to All Online Endpoints</h2>
+        <span style="font-size:.78rem;color:var(--text-muted);">Pushes selected rules to all currently Online endpoints</span>
+    </div>
+    <form method="post" action="{{ url_for('push_rules_to_all') }}" style="padding:0 0 4px 0;">
+        <div style="padding:16px;display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+            {% for rule in rules %}
+            <label style="display:flex;align-items:center;gap:8px;background:var(--bg-raised);
+                           border:1px solid var(--border);border-radius:8px;padding:8px 14px;cursor:pointer;
+                           transition:border-color 0.2s;" class="rule-checkbox-label">
+                <input type="checkbox" name="rule_ids" value="{{ rule.rule_id }}"
+                       style="accent-color:#6366f1;width:14px;height:14px;">
+                <span style="font-size:.82rem;">
+                    <strong>{{ rule.rule_name }}</strong>
+                    <span class="severity-badge {% if rule.action_type == 'BLOCK' %}danger{% else %}info{% endif %}"
+                          style="margin-left:4px;font-size:.65rem;">{{ rule.action_type }}</span>
+                    <span style="color:var(--text-muted);margin-left:4px;">{{ rule.protocol }}</span>
+                </span>
+            </label>
+            {% endfor %}
+        </div>
+        <div style="padding:0 16px 16px;">
+            <button type="submit" class="btn btn-brand" id="pushAllBtn">
+                <i data-lucide="broadcast"></i>
+                Push to All Online Endpoints
+            </button>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+
+<!-- ══ Register Endpoint Modal ═════════════════════════════════════════════ -->
+<div class="modal-overlay" id="registerModal">
+    <div class="modal-card" style="max-width:480px;border:1px solid rgba(99,102,241,0.3);">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i data-lucide="monitor-plus" style="width:18px;height:18px;color:#818cf8;"></i>
+                Register New Endpoint
+            </h3>
+            <button class="modal-close" onclick="document.getElementById('registerModal').classList.remove('show')">✕</button>
+        </div>
+        <form method="post" action="{{ url_for('endpoints') }}">
+            <div class="modal-body">
+                <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:18px;">
+                    Enter the hostname of the computer you want to manage. A secure agent token will be generated — paste it into <code>agent_config.json</code> on that machine.
+                </p>
+                <div class="form-group" style="margin-bottom:16px;">
+                    <label class="form-label">Hostname <span style="color:#f87171;">*</span></label>
+                    <input type="text" name="hostname" class="form-control"
+                           placeholder="e.g. DESKTOP-PC01, server-lab-1"
+                           required maxlength="100"
+                           style="background:var(--bg-input);border:1px solid var(--border);
+                                  color:var(--text-primary);border-radius:10px;padding:10px 14px;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">OS / Description <span style="color:var(--text-muted);">(optional)</span></label>
+                    <input type="text" name="os_info" class="form-control"
+                           placeholder="e.g. Windows 11 Pro, Lab PC"
+                           maxlength="200"
+                           style="background:var(--bg-input);border:1px solid var(--border);
+                                  color:var(--text-primary);border-radius:10px;padding:10px 14px;">
+                </div>
+                <div style="margin-top:16px;padding:12px 14px;background:rgba(99,102,241,0.08);
+                            border:1px solid rgba(99,102,241,0.2);border-radius:10px;font-size:.8rem;color:#a5b4fc;">
+                    <i data-lucide="info" style="width:13px;height:13px;display:inline;"></i>
+                    After registering, copy the generated token, then on the endpoint machine run:
+                    <code style="display:block;margin-top:6px;color:#c4b5fd;">python agent.py</code>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary"
+                        onclick="document.getElementById('registerModal').classList.remove('show')">Cancel</button>
+                <button type="submit" class="btn btn-brand" id="confirmRegisterBtn">
+                    <i data-lucide="key-round"></i> Generate Token &amp; Register
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- ══ Push Rules Modal (per-endpoint) ════════════════════════════════════ -->
+<div class="modal-overlay" id="pushModal">
+    <div class="modal-card" style="max-width:520px;border:1px solid rgba(99,102,241,0.3);">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i data-lucide="send" style="width:18px;height:18px;color:#818cf8;"></i>
+                Push Firewall Rules — <span id="pushModalTarget" style="color:#a5b4fc;"></span>
+            </h3>
+            <button class="modal-close" onclick="document.getElementById('pushModal').classList.remove('show')">✕</button>
+        </div>
+        <form id="pushModalForm" method="post" action="">
+            <div class="modal-body">
+                {% if rules %}
+                <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:16px;">
+                    Select the Active firewall rules you want to deploy to this endpoint. The agent will execute them via <code>netsh</code> on its next poll.
+                </p>
+                <div style="display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;padding-right:4px;">
+                    {% for rule in rules %}
+                    <label style="display:flex;align-items:center;gap:10px;background:var(--bg-raised);
+                                   border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:pointer;">
+                        <input type="checkbox" name="rule_ids" value="{{ rule.rule_id }}"
+                               style="accent-color:#6366f1;width:14px;height:14px;">
+                        <span style="font-size:.82rem;flex:1;">
+                            <strong>{{ rule.rule_name }}</strong>
+                            <span class="severity-badge {% if rule.action_type == 'BLOCK' %}danger{% else %}info{% endif %}"
+                                  style="margin-left:6px;font-size:.65rem;">{{ rule.action_type }}</span>
+                            <span style="color:var(--text-muted);margin-left:6px;">{{ rule.protocol }}</span>
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p style="color:var(--text-muted);font-size:.85rem;">
+                    No active firewall rules found. Create rules on the <a href="{{ url_for('rules') }}" style="color:#818cf8;">Firewall Rules</a> page first.
+                </p>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary"
+                        onclick="document.getElementById('pushModal').classList.remove('show')">Cancel</button>
+                {% if rules %}
+                <button type="submit" class="btn btn-brand" id="confirmPushBtn">
+                    <i data-lucide="send"></i> Queue Deployment
+                </button>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openPushModal(endpointId, hostname) {
+    document.getElementById('pushModalTarget').textContent = hostname;
+    document.getElementById('pushModalForm').action = '/endpoints/' + endpointId + '/push-rules';
+    document.getElementById('pushModal').classList.add('show');
+}
+
+// Auto-refresh the page every 30s to update heartbeat data
+setTimeout(function() { location.reload(); }, 30000);
+</script>
+{% endblock %}

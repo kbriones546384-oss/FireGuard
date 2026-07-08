@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="FireGuard – Firewall Rule Management and Network Traffic Filtering System">
+    <title>{% block title %}FireGuard{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='styles.css') }}" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+
+{% if current_user %}
+<div class="app-shell">
+    <!-- ── Sidebar ── -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-logo">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="FireGuard Logo" style="height: 48px; width: auto; filter: drop-shadow(0 0 6px rgba(255, 78, 0, 0.35));">
+            <div class="sidebar-logo-text">
+                <strong>FireGuard</strong>
+                <span>Security Platform</span>
+            </div>
+        </div>
+
+
+
+        <nav class="sidebar-nav">
+            <p class="sidebar-section-label">Overview</p>
+            <a class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}"
+               href="{{ url_for('dashboard') }}" title="Dashboard">
+                <i data-lucide="layout-dashboard"></i>
+                <span class="nav-item-label">Dashboard</span>
+            </a>
+
+            {% if current_user.role == 'Administrator' %}
+            <p class="sidebar-section-label">Management</p>
+            <a class="nav-item {% if request.endpoint in ['rules','edit_rule'] %}active{% endif %}"
+               href="{{ url_for('rules') }}" title="Firewall Rules">
+                <i data-lucide="shield"></i>
+                <span class="nav-item-label">Firewall Rules</span>
+            </a>
+            <a class="nav-item {% if request.endpoint in ['endpoints','push_rules_to_endpoint','delete_endpoint'] %}active{% endif %}"
+               href="{{ url_for('endpoints') }}" title="Endpoints">
+                <i data-lucide="monitor"></i>
+                <span class="nav-item-label">Endpoints</span>
+            </a>
+            {% endif %}
+
+            <p class="sidebar-section-label">Monitoring</p>
+            <a class="nav-item {% if request.endpoint == 'logs' %}active{% endif %}"
+               href="{{ url_for('logs') }}" title="Traffic Logs">
+                <i data-lucide="activity"></i>
+                <span class="nav-item-label">Traffic Logs</span>
+            </a>
+            <a class="nav-item {% if request.endpoint == 'alerts' %}active{% endif %}"
+               href="{{ url_for('alerts') }}" title="Alerts">
+                <i data-lucide="bell-ring"></i>
+                <span class="nav-item-label">Alerts</span>
+            </a>
+
+            {% if current_user.role in ['Administrator', 'Security Analyst'] %}
+            <p class="sidebar-section-label">Reports</p>
+            <a class="nav-item {% if request.endpoint == 'reports' %}active{% endif %}"
+               href="{{ url_for('reports') }}" title="Reports">
+                <i data-lucide="file-bar-chart"></i>
+                <span class="nav-item-label">Reports</span>
+            </a>
+            {% endif %}
+
+            {% if current_user.role == 'Administrator' %}
+            <p class="sidebar-section-label">Settings</p>
+            <a class="nav-item {% if request.endpoint == 'users' %}active{% endif %}"
+               href="{{ url_for('users') }}" title="User Accounts">
+                <i data-lucide="users"></i>
+                <span class="nav-item-label">User Accounts</span>
+            </a>
+            {% endif %}
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <span class="user-avatar">{{ current_user.username[0].upper() }}</span>
+                <div class="user-info">
+                    <strong>{{ current_user.username }}</strong>
+                    <span>{{ current_user.role }}</span>
+                </div>
+                <a class="logout-btn" href="{{ url_for('logout') }}" title="Sign out">
+                    <i data-lucide="log-out"></i>
+                </a>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ── Main area ── -->
+    <div class="main-area">
+        <!-- Topbar -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <span class="mode-pill">{{ firewall_mode }} Mode</span>
+            </div>
+            <div class="topbar-right">
+                <span class="topbar-time" id="topbarClock"></span>
+            </div>
+        </header>
+
+        <main class="page-content">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-stack">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+
+<!-- Custom modal overlays using pre-defined FireGuard stylesheet styles -->
+<div class="modal-overlay" id="attackModal">
+    <div class="modal-card" style="border: 1px solid rgba(239, 68, 68, 0.35); box-shadow: 0 16px 40px rgba(239, 68, 68, 0.15);">
+        <h3 style="display:flex; align-items:center; gap:8px;">
+            <i data-lucide="siren" style="color:var(--accent-red); width:20px; height:20px;"></i>
+            Simulate Attack
+        </h3>
+        <p>Specify the IP address of the simulated host to generate network traffic events.</p>
+        
+        <form method="post" action="{{ url_for('simulate_attack') }}">
+            <div style="margin-bottom: 20px;">
+                <label for="attackerIpInput" style="display: block; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 6px;">Attacker IP Address</label>
+                <input type="text" name="attacker_ip" id="attackerIpInput" class="form-control" value="192.168.1.99" placeholder="e.g. 192.168.1.99" required style="background: var(--bg-deep); border: 1px solid var(--border-bright); color: var(--text-primary); border-radius: 8px; padding: 8px 12px; width: 100%;">
+            </div>
+            
+            <div class="modal-actions">
+                <button type="button" class="btn btn-outline-secondary" onclick="closeAttackModal()" style="border-radius: 8px; font-size:0.85rem; padding: 6px 12px;">Cancel</button>
+                <button type="submit" class="btn btn-danger" style="background: linear-gradient(135deg,#dc2626,#b91c1c); border: none; border-radius: 8px; font-size:0.85rem; padding: 6px 16px; font-weight:600; display:flex; align-items:center; gap:6px; color:#fff;">
+                    Run Simulation
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal-overlay" id="unblockModal">
+    <div class="modal-card" style="border: 1px solid rgba(16, 185, 129, 0.35); box-shadow: 0 16px 40px rgba(16, 185, 129, 0.15);">
+        <h3 style="display:flex; align-items:center; gap:8px;">
+            <i data-lucide="shield-check" style="color:var(--accent-green); width:20px; height:20px;"></i>
+            Confirm IP Unblock
+        </h3>
+        <p>Are you sure you want to unblock <strong id="unblockIpText" style="color: var(--accent-green); font-family: monospace;"></strong>? This IP will immediately be removed from the blocked list.</p>
+        
+        <form method="post" action="{{ url_for('unblock_ip') }}" id="unblockForm">
+            <input type="hidden" name="ip_address" id="unblockIpField" value="">
+            
+            <div class="modal-actions">
+                <button type="button" class="btn btn-outline-secondary" onclick="closeUnblockModal()" style="border-radius: 8px; font-size:0.85rem; padding: 6px 12px;">Cancel</button>
+                <button type="submit" class="btn btn-success" style="background: var(--accent-green); border: none; border-radius: 8px; font-size:0.85rem; padding: 6px 16px; font-weight:600; color: #fff;">Confirm Unblock</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% else %}
+<main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-stack" style="position:fixed;top:20px;right:20px;z-index:999;max-width:380px;">
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+    {{ self.content() }}
+</main>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    lucide.createIcons();
+
+    // Real-time clock
+    (function updateClock() {
+        const el = document.getElementById('topbarClock');
+        if (!el) return;
+        const now = new Date();
+        el.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        setTimeout(updateClock, 1000);
+    })();
+
+    // Auto-dismiss flash messages after 5s
+    setTimeout(() => {
+        document.querySelectorAll('.alert.fade.show').forEach(a => {
+            a.classList.remove('show');
+            setTimeout(() => a.remove(), 300);
+        });
+    }, 5000);
+
+    // Custom Modal Controllers
+    window.openAttackModal = function(event) {
+        if (event) event.preventDefault();
+        document.getElementById('attackModal').classList.add('show');
+    };
+    window.closeAttackModal = function() {
+        document.getElementById('attackModal').classList.remove('show');
+    };
+
+    window.openUnblockModal = function(ip) {
+        const textEl = document.getElementById('unblockIpText');
+        const fieldEl = document.getElementById('unblockIpField');
+        if (textEl && fieldEl) {
+            textEl.textContent = ip;
+            fieldEl.value = ip;
+            document.getElementById('unblockModal').classList.add('show');
+            lucide.createIcons();
+        }
+    };
+    window.closeUnblockModal = function() {
+        document.getElementById('unblockModal').classList.remove('show');
+    };
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

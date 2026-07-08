@@ -1,0 +1,29 @@
+<div class="table-responsive">
+    <table class="table align-middle mb-0">
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Source</th>
+                <th>Destination</th>
+                <th>Port</th>
+                <th>Protocol</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% set log_source = logs if logs is defined and logs else recent_logs %}
+            {% for log in log_source %}
+            <tr class="row-{{ log.action_type | lower }}">
+                <td style="font-size:.78rem;color:var(--text-muted);white-space:nowrap;">{{ log.log_time }}</td>
+                <td style="font-family:monospace;font-size:.8rem;">{{ log.source_ip }}</td>
+                <td style="font-family:monospace;font-size:.8rem;">{{ log.destination_ip }}</td>
+                <td>{{ log.port }}</td>
+                <td>{{ log.protocol }}</td>
+                <td><span class="status-badge {{ log.action_type | lower }}">{{ log.action_type }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-secondary py-4">No traffic logs yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

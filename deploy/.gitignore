@@ -1,0 +1,18 @@
+# Ignore database files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Ignore log files
+*.log
+*.err
+
+# Ignore Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore local config overrides
+local_settings.json

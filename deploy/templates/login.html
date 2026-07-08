@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Sign In · FireGuard{% endblock %}
+
+{% block content %}
+<section class="login-shell">
+    <div class="login-bg-grid"></div>
+    <div class="login-bg-glow"></div>
+
+    <div class="login-panel">
+        <div class="brand-lockup" style="display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 20px;">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="FireGuard Logo" style="height: 180px; width: auto; filter: drop-shadow(0 0 12px rgba(255, 78, 0, 0.35));">
+        </div>
+
+
+
+        <form method="post" class="login-form" id="loginForm">
+            <div>
+                <label class="form-label" for="username">Username</label>
+                <input class="form-control form-control-lg" id="username" name="username"
+                       required autofocus autocomplete="username" maxlength="100"
+                       placeholder="Enter your username">
+            </div>
+            <div>
+                <label class="form-label" for="password">Password</label>
+                <input class="form-control form-control-lg" id="password" name="password"
+                       type="password" required autocomplete="current-password" maxlength="200"
+                       placeholder="••••••••">
+            </div>
+            <button class="btn btn-brand btn-lg w-100" type="submit" id="loginBtn">
+                <i data-lucide="shield-check"></i>
+                Sign in to FireGuard
+            </button>
+        </form>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('loginForm').addEventListener('submit', function() {
+    const btn = document.getElementById('loginBtn');
+    btn.innerHTML = '<i data-lucide="loader-2" class="spin"></i> Signing in…';
+    btn.disabled = true;
+    lucide.createIcons();
+});
+</script>
+<style>
+.spin { animation: spin .8s linear infinite; display:inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}

@@ -1,0 +1,8 @@
+flask
+werkzeug
+reportlab
+psutil
+requests
+pyotp
+qrcode
+Pillow
