@@ -29,12 +29,14 @@ Write-Host "Found: $pyver" -ForegroundColor Green
 Write-Host ""
 
 # ── 2. Ask for the two values shown on the server's /endpoints page ────────
-Write-Host "On the FireGuard SERVER laptop, log in as Administrator and open the" -ForegroundColor Cyan
+Write-Host "Log in to the FireGuard dashboard as Administrator and open the" -ForegroundColor Cyan
 Write-Host "'Endpoints' page. Copy the 'Server URL' and 'Global Registration Key'" -ForegroundColor Cyan
 Write-Host "shown in the 'Endpoint Self-Registration' box, and paste them below." -ForegroundColor Cyan
+Write-Host "This works whether the server is on the same Wi-Fi (e.g. http://192.168.1.10:5000)" -ForegroundColor Cyan
+Write-Host "or hosted online, like Render (e.g. https://your-app.onrender.com)." -ForegroundColor Cyan
 Write-Host ""
 
-$ServerUrl = Read-Host "Server URL (e.g. http://192.168.1.10:5000)"
+$ServerUrl = Read-Host "Server URL (e.g. https://your-app.onrender.com)"
 while ([string]::IsNullOrWhiteSpace($ServerUrl)) {
     $ServerUrl = Read-Host "Server URL is required. Enter it now"
 }
@@ -73,8 +75,14 @@ try {
     Write-Host "Server reachable (HTTP $($resp.StatusCode)). Good." -ForegroundColor Green
 } catch {
     Write-Host "Could not reach $ServerUrl from this machine." -ForegroundColor Red
-    Write-Host "Check that: both laptops are on the same Wi-Fi/network, the FireGuard" -ForegroundColor Yellow
-    Write-Host "server is running, and no firewall is blocking port 5000." -ForegroundColor Yellow
+    Write-Host "Check that: the FireGuard server is running and reachable, and that" -ForegroundColor Yellow
+    Write-Host "the Server URL is correct (no typo, matches http/https, includes the" -ForegroundColor Yellow
+    Write-Host "right port if self-hosted on a LAN)." -ForegroundColor Yellow
+    Write-Host "  - Same-Wi-Fi setup: confirm both machines share a network and the" -ForegroundColor Yellow
+    Write-Host "    server's Windows Firewall allows inbound connections on its port." -ForegroundColor Yellow
+    Write-Host "  - Render/cloud setup: confirm this machine has internet access and" -ForegroundColor Yellow
+    Write-Host "    the URL uses https:// (Render redirects http:// to https://, which" -ForegroundColor Yellow
+    Write-Host "    can break the agent's registration request)." -ForegroundColor Yellow
 }
 
 Write-Host ""

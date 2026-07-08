@@ -7,23 +7,27 @@ This folder turns another Windows laptop into a FireGuard-managed endpoint,
 so it shows up live on the FireGuard dashboard's Endpoints page during your
 demo/defense.
 
-You need TWO laptops on the SAME Wi-Fi/network:
-  - Laptop A = the FireGuard SERVER (runs app.py, has the web dashboard)
-  - Laptop B = the ENDPOINT being managed (this installer goes here)
+You need the FireGuard SERVER running somewhere reachable, and a second
+Windows laptop to act as the ENDPOINT (this installer goes there). The
+server can be either:
+  (a) Another laptop on the SAME Wi-Fi/network (runs app.py locally), or
+  (b) A cloud-hosted deployment (e.g. Render) reachable over the internet
+      from anywhere — no shared Wi-Fi needed.
 
-HOW TO USE (on Laptop B, the second laptop)
---------------------------------------------
-1. Copy this whole "agent_installer" folder onto Laptop B (USB drive, shared
-   folder, AirDrop-equivalent, whatever's easiest).
+HOW TO USE (on the laptop being managed, i.e. the endpoint)
+--------------------------------------------------------------
+1. Copy this whole "agent_installer" folder onto the endpoint laptop (USB
+   drive, shared folder, AirDrop-equivalent, whatever's easiest).
 
-2. On Laptop A (the server), make sure FireGuard is running (python app.py),
-   log into the dashboard as an Administrator, and open the "Endpoints" page.
-   You'll see a box titled "Endpoint Self-Registration" showing:
-       Server URL               e.g. http://192.168.1.10:5000
+2. On the server (either the other laptop, or your Render dashboard), log in
+   as an Administrator and open the "Endpoints" page. You'll see a box
+   titled "Endpoint Self-Registration" showing:
+       Server URL               e.g. http://192.168.1.10:5000 (same-Wi-Fi)
+                                 or   https://your-app.onrender.com (cloud)
        Global Registration Key  e.g. fireguard-register-token
    Keep that page open, or copy both values somewhere.
 
-3. On Laptop B, right-click "Install-FireGuardAgent.ps1" -> "Run with
+3. On the endpoint laptop, right-click "Install-FireGuardAgent.ps1" -> "Run with
    PowerShell". If Windows blocks it, right-click -> Properties -> check
    "Unblock" -> OK, then try again. (Or run it from a PowerShell window:
    powershell -ExecutionPolicy Bypass -File Install-FireGuardAgent.ps1)
@@ -41,8 +45,9 @@ HOW TO USE (on Laptop B, the second laptop)
        [Agent] Heartbeat OK | CPU 12.3% | MEM 44.1% | Conns 38 | FW ON
    Leave this window open during the demo.
 
-5. Back on Laptop A's dashboard -> Endpoints page, Laptop B should appear
-   within a few seconds, listed by its own hostname, status "Online".
+5. Back on the server's dashboard -> Endpoints page, the endpoint laptop
+   should appear within a few seconds, listed by its own hostname, status
+   "Online".
 
 THAT'S IT - no manual token copy-pasting needed. The agent registers itself
 the first time it runs, using the shared Registration Key, and remembers its
@@ -50,13 +55,28 @@ token afterwards (saved into agent_config.json).
 
 TROUBLESHOOTING
 ---------------
+Same-Wi-Fi server:
 - "Could not reach server" during install: confirm both laptops are on the
-  same network, and Laptop A's Windows Firewall allows inbound connections
-  on port 5000 (or temporarily disable Laptop A's firewall for the demo).
+  same network, and the server laptop's Windows Firewall allows inbound
+  connections on port 5000 (or temporarily disable it for the demo).
 - Endpoint never shows up online: check the Start-FireGuardAgent.ps1 window
   for error lines - "POST error" usually means the Server URL is wrong
-  (typo, wrong IP, or Laptop A's IP changed after reconnecting to Wi-Fi).
-- Laptop A's LAN IP changes if it reconnects to Wi-Fi: just re-check the
-  Endpoints page for the current Server URL and re-run Install if it changed.
+  (typo, wrong IP, or the server laptop's IP changed after reconnecting to
+  Wi-Fi).
+- The server laptop's LAN IP changes if it reconnects to Wi-Fi: just re-check
+  the Endpoints page for the current Server URL and re-run Install if it
+  changed.
+
+Render/cloud server:
+- "Could not reach server" during install: confirm this machine has internet
+  access, and that the Server URL uses https:// (not http://) - Render
+  redirects http requests to https, and that redirect can break the agent's
+  self-registration request.
+- Endpoint never shows up online: the free Render tier can spin the service
+  down after inactivity, causing the first request after a while to be slow
+  or briefly fail - try again after a few seconds, or check the Render
+  dashboard's logs for errors.
+
+Either setup:
 - To re-run setup from scratch: delete agent_config.json in this folder and
   run Install-FireGuardAgent.ps1 again.

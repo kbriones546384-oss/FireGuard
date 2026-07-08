@@ -21,6 +21,7 @@ import pyotp
 import qrcode
 import requests
 import sqlite3
+from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import (
     Flask,
     Response,
@@ -119,6 +120,7 @@ RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY", "6LeIxAcTAAAAAGG-vFI1Tn
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "fireguard-dev-secret")
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 
 # ── Database helpers ────────────────────────────────────────────────────────
